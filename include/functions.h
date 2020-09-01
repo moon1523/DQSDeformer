@@ -272,6 +272,20 @@ void SetWeights3(const vector<Point3> nodes, vector<vector<double>> &weights, ma
     cout<<"-done"<<endl;
 }
 
+std::vector<std::map<int, double>> ReadWeights(string fileName){
+    ifstream ifs(fileName);
+    string dump;
+    std::vector<std::map<int, double>> weights;
+    while(getline(ifs, dump)){
+        stringstream ss(dump);
+        int id; double w;
+        std::map<int, double> wMap;
+        while(ss>>id>>w)
+            wMap[id] = w;
+        weights.push_back(wMap);
+    }ifs.close();
+    return weights;
+}
 
 void ReadPly(string name, vector<Point3> &verts, vector<vector<int>> &faces)
 {
@@ -466,6 +480,36 @@ void dual_quat_deformer(const std::vector<Point3>& in_verts,
         if( dual_quat.rotation().dot( Dual_quat_cu::identity().rotation() ) < 0.f )
             w1 *= -1.f;
         Dual_quat_cu dq_blend = Dual_quat_cu::identity()*w0 + dual_quat*w1;
+
+        // Compute animated position
+        Point3 vi = dq_blend.transform( in_verts[v] );
+        out_verts.push_back(vi);
+    }
+}
+
+void dual_quat_deformer(const std::vector<Point3>& in_verts,
+                        std::vector<Point3>& out_verts,
+                        const std::vector<Dual_quat_cu>& dual_quat,
+                        const std::vector<std::map<int, double>>& weights)
+{
+    out_verts.clear();
+    for(unsigned v = 0; v < in_verts.size(); ++v)
+    {
+        Dual_quat_cu dq_blend;
+        bool first(true);
+        Quat_cu q0;
+
+        for(auto w:weights[v]){
+            if(first){
+                dq_blend = dual_quat[w.first] * w.second;
+                q0 = dual_quat[w.first].rotation();
+                first = false;
+                continue;
+            }
+            if( dual_quat[w.first].rotation().dot( q0 ) < 0.f )
+                w.second *= -1.f;
+            dq_blend = dq_blend + dual_quat[w.first] * w.second;
+        }
 
         // Compute animated position
         Point3 vi = dq_blend.transform( in_verts[v] );

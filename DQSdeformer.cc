@@ -4,17 +4,79 @@
 #include "G4SystemOfUnits.hh"
 #include "G4Timer.hh"
 #include "KinectData.hh"
+#include "Polygon.hh"
 int main(int argc, char** argv){
-    KinectData kinect;
-    kinect.ReadKinectData("Posture.txt");
-    kinect.Deform();
+    //KinectData kinect;
+    //kinect.ReadKinectData("Posture.txt");
+    //kinect.Deform();
+    string objF, objWeight, tetF, tetWeight;
+    for(int i=1; i<argc;i++){
+        if     (string(argv[i])=="-pol") {
+            objF = argv[++i]; objWeight = argv[++i];
+        }
+        else if(string(argv[i])=="-tet") {
+            tetF = argv[++i]; tetWeight = argv[++i];
+        }
+    }
 
     G4Timer timer;
-    vector<Point3> verts, outVerts;
-    map<int, vector<vector<int>>> faces;
-    auto tessPair = ReadObj("RightArm1.obj", verts, faces);
-    vector<vector<double>> weights;
-    SetWeights2(verts, weights, faces, tessPair);
+    //read polygon data
+    Polygon polygon;
+    vector<map<int, double>> polWeights;
+    if(objF.size()){
+        cout<<"Reading polygon data.."<<flush; timer.Start();
+        polygon = Polygon(objF);
+        timer.Stop(); cout<<timer.GetRealElapsed()<<" ("<<polygon.GetVerts().size()<<")"<<endl;
+
+        cout<<"Reading weight data.."<<flush; timer.Start();
+        polWeights = ReadWeights(objWeight);
+        timer.Stop(); cout<<timer.GetRealElapsed()<<" ("<<polWeights.size()<<")"<<endl;
+    }
+    vector<Point3> polVertices = polygon.GetVerts();
+
+    //initialize joint info. & dual quaternions
+    vector<Vec3> jointCenter; vector<int> jointParent;
+    ifstream ifs("jointInfo");
+    if(!ifs.is_open()) {cerr<<"There is no jointInfo"<<endl; return 1;}
+    cout<<"Reading jointInfo file.."<<flush; timer.Start();
+    string dump; int parentID; double x, y, z;
+    getline(ifs, dump);
+    while(ifs>>dump>>dump>>parentID>>x>>y>>z){
+        jointCenter.push_back(Vec3(x, y, z));
+        jointParent.push_back(parentID);
+    }ifs.close();
+    timer.Stop(); cout<<timer.GetRealElapsed()<<" ("<<jointCenter.size()<<")"<<endl;
+    vector<Dual_quat_cu> dual_quat; dual_quat.reserve(jointCenter.size());
+
+    //start deformation
+    for(int n=0;;n++){
+        for(int i=0;i<jointCenter.size();i++)
+            dual_quat[i] = Dual_quat_cu::identity();
+        double x,y,z;
+        int id; double angle;
+        cout<<"id: "; cin>>id; if(id<0) break;
+        cin.clear();cin.ignore(256, '\n');
+        std::string axisStr;
+        std::cout<<"axis: ";
+        std::getline(std::cin, axisStr);
+        stringstream buff(axisStr); buff>>x>>y>>z;
+        cout<<"degree: "; cin>>angle; angle *= deg;
+
+        Transfo tf; tf.rotate(jointCenter[jointParent[id]], Vec3(x,y,z), angle);
+        dual_quat[id] = Dual_quat_cu(tf);
+        for(int i=0;i<jointCenter.size();i++){
+            dual_quat[i] = dual_quat[jointParent[i]];
+        }
+        vector<Point3> newPolVerts;
+        dual_quat_deformer(polVertices,newPolVerts,dual_quat,polWeights);
+        polygon.SetVerts(newPolVerts);
+        polygon.PrintOBJ(polygon.GetName()+to_string(n)+".obj");
+    }
+
+
+    // vector<vector<double>> weights = ReadWeights(weightsF);
+
+/*
 
     vector<Point3> nodes, outNodes;
     map<int, vector<int>> attributes;
@@ -25,9 +87,9 @@ int main(int argc, char** argv){
     SetWeights3(nodes, weightsN, attributes);
     WriteEle("weights.ele", eleVol, nodes, weightsN);
 
-    //vector<vector<int>> faces;
+   // vector<vector<int>> faces;
    // vector<vector<double>> weights;
-   //ReadPly("rightArm5.ply", verts, faces);
+   // ReadPly("rightArm5.ply", verts, faces);
    // system("tetgen -q rightArm.ply");
 
 
@@ -56,6 +118,6 @@ int main(int argc, char** argv){
         PrintObj(fileN, outVerts, faces);
         //PrintPly(fileN, outVerts, faces);
         PrintNode(fileN, outNodes);
-    }
+    }*/
     return 0;
 }

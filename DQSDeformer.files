@@ -1,0 +1,15 @@
+src/TetMesh.cpp
+include/TetMesh.h
+src/Polygon.cc
+DQSdeformer.cc
+Dual-Quaternion-Skinning-Sample-Codes/dual_quat_cu.hpp
+Dual-Quaternion-Skinning-Sample-Codes/mat3.hpp
+Dual-Quaternion-Skinning-Sample-Codes/point3.hpp
+Dual-Quaternion-Skinning-Sample-Codes/quat_cu.hpp
+Dual-Quaternion-Skinning-Sample-Codes/transfo.hpp
+Dual-Quaternion-Skinning-Sample-Codes/usage.cpp
+Dual-Quaternion-Skinning-Sample-Codes/vec3.hpp
+include/KinectData.hh
+include/Polygon.hh
+include/functions.h
+src/KinectData.cc
