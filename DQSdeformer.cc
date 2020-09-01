@@ -40,7 +40,7 @@ int main(int argc, char** argv){
     if(!ifs.is_open()) {cerr<<"There is no jointInfo"<<endl; return 1;}
     cout<<"Reading jointInfo file.."<<flush; timer.Start();
     string dump; int parentID; double x, y, z;
-    getline(ifs, dump);
+   // getline(ifs, dump);
     while(ifs>>dump>>dump>>parentID>>x>>y>>z){
         jointCenter.push_back(Vec3(x, y, z));
         jointParent.push_back(parentID);
@@ -59,65 +59,21 @@ int main(int argc, char** argv){
         std::string axisStr;
         std::cout<<"axis: ";
         std::getline(std::cin, axisStr);
-        stringstream buff(axisStr); buff>>x>>y>>z;
+        stringstream ss(axisStr); ss>>x>>y>>z;
         cout<<"degree: "; cin>>angle; angle *= deg;
-
-        Transfo tf; tf.rotate(jointCenter[jointParent[id]], Vec3(x,y,z), angle);
+        Transfo tf = Transfo::rotate(jointCenter[id], Vec3(x,y,z), angle);
         dual_quat[id] = Dual_quat_cu(tf);
-        for(int i=0;i<jointCenter.size();i++){
+        for(int i=id+1;i<jointCenter.size();i++){
+            if(i==jointCenter.size()) break;
             dual_quat[i] = dual_quat[jointParent[i]];
         }
         vector<Point3> newPolVerts;
+        cout<<"Start deformation.."<<flush; timer.Start();
         dual_quat_deformer(polVertices,newPolVerts,dual_quat,polWeights);
+        timer.Stop(); cout<<timer.GetRealElapsed()<<endl;
         polygon.SetVerts(newPolVerts);
         polygon.PrintOBJ(polygon.GetName()+to_string(n)+".obj");
     }
 
-
-    // vector<vector<double>> weights = ReadWeights(weightsF);
-
-/*
-
-    vector<Point3> nodes, outNodes;
-    map<int, vector<int>> attributes;
-    vector<vector<double>> weightsN;
-    vector<pair<vector<int>, double>> eleVol;
-    ReadNode("RightArm1.2.node", nodes);
-    ReadEle2("RightArm1.2.ele", nodes, eleVol, attributes);
-    SetWeights3(nodes, weightsN, attributes);
-    WriteEle("weights.ele", eleVol, nodes, weightsN);
-
-   // vector<vector<int>> faces;
-   // vector<vector<double>> weights;
-   // ReadPly("rightArm5.ply", verts, faces);
-   // system("tetgen -q rightArm.ply");
-
-
-    G4RotationMatrix rot = G4RotationMatrix::IDENTITY;
-
-    for(int i=0;i<15;i++){
-        cout<<"angle-->"<<i*10+10<<endl;
-        rot.rotateX(-10*degree);
-        Transfo tf;
-        tf.set_mat3(Mat3(rot.col1().getX(), rot.col2().getX(), rot.col3().getX(),
-                         rot.col1().getY(), rot.col2().getY(), rot.col3().getY(),
-                         rot.col1().getZ(), rot.col2().getZ(), rot.col3().getZ()));
-        Dual_quat_cu dq(tf);
-        timer.Start();
-        dual_quat_deformer(verts, outVerts, dq, weights);
-        timer.Stop();
-        cout<<"time(PM) --> "<<timer.GetRealElapsed()<<endl;
-
-        timer.Start();
-        dual_quat_deformer(nodes, outNodes, dq, weightsN);
-        timer.Stop();
-        cout<<"time(TM) --> "<<timer.GetRealElapsed()<<endl;
-        DetectTangled(outNodes, eleVol);
-
-        string fileN = "boneTest0_" + to_string(i);//+".ply";
-        PrintObj(fileN, outVerts, faces);
-        //PrintPly(fileN, outVerts, faces);
-        PrintNode(fileN, outNodes);
-    }*/
     return 0;
 }

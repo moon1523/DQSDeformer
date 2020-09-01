@@ -275,13 +275,18 @@ void SetWeights3(const vector<Point3> nodes, vector<vector<double>> &weights, ma
 std::vector<std::map<int, double>> ReadWeights(string fileName){
     ifstream ifs(fileName);
     string dump;
+    stringstream ss;
+    std::map<int, double> wMap;
     std::vector<std::map<int, double>> weights;
     while(getline(ifs, dump)){
-        stringstream ss(dump);
+        ss.clear(); wMap.clear();
+        ss.str(dump);
         int id; double w;
-        std::map<int, double> wMap;
-        while(ss>>id>>w)
+        ss>>dump;
+        while(ss>>id){
+            ss>>w;
             wMap[id] = w;
+        }
         weights.push_back(wMap);
     }ifs.close();
     return weights;
@@ -507,8 +512,8 @@ void dual_quat_deformer(const std::vector<Point3>& in_verts,
                 continue;
             }
             if( dual_quat[w.first].rotation().dot( q0 ) < 0.f )
-                w.second *= -1.f;
-            dq_blend = dq_blend + dual_quat[w.first] * w.second;
+                dq_blend = dq_blend + dual_quat[w.first] * (-w.second);
+            else dq_blend = dq_blend + dual_quat[w.first] * w.second;
         }
 
         // Compute animated position
