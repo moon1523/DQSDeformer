@@ -1,3 +1,6 @@
+#ifndef FUNCTIONS_HH
+#define FUNCTIONS_HH
+
 #include <fstream>
 #include <iostream>
 #include <vector>
@@ -10,6 +13,88 @@
 #include "G4ThreeVector.hh"
 using namespace std;
 using namespace Tbx;
+
+void SkelTest(string fileName){
+    ifstream ifs(fileName);
+    if(!ifs.is_open()) {cerr<<"There is no "+fileName<<endl; exit(1);}
+
+    string dump;
+    vector<G4ThreeVector> vertices;
+    vector<vector<int>> faces;
+    G4ThreeVector aPoint;
+    int a, b, c, vertCount(0);
+    ofstream ofs2("skel.weight");
+    while(getline(ifs, dump)){
+        stringstream ss(dump);
+        ss>>dump;
+        if(dump=="v"){
+            ss>>aPoint;
+            vertices.push_back(aPoint);
+            vertCount++;
+        }
+        else if(dump=="g"){
+            string shellName;
+            ss>>shellName;
+            int id = atoi(shellName.c_str());
+            for(int i=vertices.size()-vertCount;i<vertices.size();i++){
+                ofs2<<i<<" "<<id<<" 1"<<endl;
+            }
+            vertCount = 0;
+        }
+        else if(dump=="f"){
+            ss>>a>>b>>c;
+            faces.push_back({a-1,b-1,c-1});
+        }
+    }ifs.close(); ofs2.close();
+    cout<<"Imported "+fileName<<endl;
+    ofstream ofs("skel.ply");
+    ofs<<"ply"<<endl;
+    ofs<<"format ascii 1.0"<<endl;
+    ofs<<"comment Exported by RapidForm"<<endl;
+    ofs<<"element vertex "<<vertices.size()<<endl;
+    ofs<<"property float x"<<endl;
+    ofs<<"property float y"<<endl;
+    ofs<<"property float z"<<endl;
+    ofs<<"element face "<<faces.size()<<endl;
+    ofs<<"property list uchar int vertex_index"<<endl;
+    ofs<<"end_header"<<endl;
+    for(G4ThreeVector v:vertices)
+        ofs<<v.getX()<<" "<<v.getY()<<" "<<v.getZ()<<endl;
+    for(auto f:faces)
+        ofs<<"3 "<<f[0]<<" "<<f[1]<<" "<<f[2]<<endl;
+    ofs.close();
+    cout<<"skel.ply was generated"<<endl;
+
+    exit(2);
+}
+
+map<int, Vec3> ReadJointF(string jointF){
+    ifstream ifs(jointF);
+    if(!ifs.is_open()){
+        cout<<jointF<<" is not open"<<endl;
+        exit(1);
+    }
+    int id; double x, y, z;
+    map<int, Vec3> jointCenters;
+    while(ifs>>id>>x>>y>>z)
+        jointCenters[id]=Vec3(x,y,z);
+    cout<<"Imported "<<jointCenters.size()<<" joint centers"<<endl;
+    return jointCenters;
+}
+
+map<int, int> ReadKinectJoint(string kinectJointF){
+    ifstream ifs(kinectJointF);
+    if(!ifs.is_open()){
+        cout<<kinectJointF<<" is not open"<<endl;
+        exit(1);
+    }
+    int id,p_id; string dump;
+    map<int, int> parentJ;
+    while(ifs>>id>>dump>>p_id)
+        parentJ[id]=p_id;
+    cout<<"Imported "<<parentJ.size()<<" KINECT joint info."<<endl;
+    return parentJ;
+}
 
 //Specification
 pair<G4TessellatedSolid*, G4TessellatedSolid*> ReadObj(string name, vector<Point3> &verts, map<int,vector<vector<int>>> &faces){
@@ -278,15 +363,45 @@ std::vector<std::map<int, double>> ReadWeights(string fileName){
     stringstream ss;
     std::map<int, double> wMap;
     std::vector<std::map<int, double>> weights;
+    double cut(1e-7);
     while(getline(ifs, dump)){
         ss.clear(); wMap.clear();
         ss.str(dump);
-        int id; double w;
+        int id; double w, sum(0);
         ss>>dump;
         while(ss>>id){
             ss>>w;
+            if(w<cut) continue;
+            sum += w;
             wMap[id] = w;
         }
+        for(auto &w:wMap) w.second /= sum;
+        weights.push_back(wMap);
+    }ifs.close();
+
+    return weights;
+}
+
+std::vector<std::map<int, double>> ReadWeightMat(string fileName){
+    double cut(1e-7);
+    ifstream ifs(fileName);
+    string dump;
+    stringstream ss;
+    std::map<int, double> wMap;
+    std::vector<std::map<int, double>> weights;
+    while(getline(ifs, dump)){
+        ss.clear(); wMap.clear();
+        ss.str(dump);
+        int id(0); double w;
+        double sum(0);
+        while(ss>>w){
+            if(w>cut){
+                wMap[id] = w;
+                sum += w;
+            }
+            id++;
+        }
+        for(auto &w:wMap) w.second /= sum;
         weights.push_back(wMap);
     }ifs.close();
     return weights;
@@ -494,7 +609,7 @@ void dual_quat_deformer(const std::vector<Point3>& in_verts,
 
 void dual_quat_deformer(const std::vector<Point3>& in_verts,
                         std::vector<Point3>& out_verts,
-                        const std::vector<Dual_quat_cu>& dual_quat,
+                        std::map<int, Dual_quat_cu>& dual_quat,
                         const std::vector<std::map<int, double>>& weights)
 {
     out_verts.clear();
@@ -521,3 +636,131 @@ void dual_quat_deformer(const std::vector<Point3>& in_verts,
         out_verts.push_back(vi);
     }
 }
+
+void dual_quat_deformer(const std::vector<Point3>& in_verts,
+                        std::vector<Point3>& out_verts,
+                        std::map<int, Dual_quat_cu>& dual_quat,
+                        const std::vector<std::map<int, double>>& weights,
+                        std::map<int, Vec3>& newCenters)
+{
+    out_verts.clear();
+    for(unsigned v = 0; v < in_verts.size(); ++v)
+    {
+        Dual_quat_cu dq_blend;
+        bool first(true);
+        Quat_cu q0;
+
+        for(auto w:weights[v]){
+            if(first){
+                dq_blend = dual_quat[w.first] * w.second;
+                q0 = dual_quat[w.first].rotation();
+                first = false;
+                continue;
+            }
+            if( dual_quat[w.first].rotation().dot( q0 ) < 0.f )
+                dq_blend = dq_blend + dual_quat[w.first] * (-w.second);
+            else dq_blend = dq_blend + dual_quat[w.first] * w.second;
+        }
+
+        // Compute animated position
+        Point3 vi = dq_blend.transform( in_verts[v] );
+        out_verts.push_back(vi);
+    }
+}
+
+Mat3 G4Mat2TBXMat(G4RotationMatrix mat){
+    return Mat3(mat.xx(),mat.xy(), mat.xz(),mat.yx(),mat.yy(),mat.yz(),mat.zx(),mat.zy(),mat.zz());
+}
+
+#include "linmath.h"
+Transfo GetRotMatrix(Vec3 from, Vec3 to) {
+    Vec3 axis = from.cross(to); axis.normalize();
+    double theta = acos(from.dot(to) / (from.norm()*to.norm()));
+    return Transfo::rotate(axis,theta);
+}
+
+
+map<int, Transfo> CalculateScalingVec(map<int, Vec3> jCen,
+                                      map<int, Vec3>& newCen,
+                                   map<int, int> parentJ,
+                                   map<int, double> lengths){
+    newCen = jCen;
+    map<int, Transfo> scalingTF;
+    for(auto j:jCen) scalingTF[j.first] = Transfo::identity();
+    vector<int> group = {1,2};
+    for(int id:group){
+        Vec3 orientation = jCen[id]-jCen[parentJ[id]]; //orientation from parent
+        orientation.normalize();
+        newCen[id] = newCen[parentJ[id]] + lengths[id]*orientation;
+    }
+
+    //torso
+    double xz_scale0 = (lengths[18]+lengths[22]) / (jCen[18]-jCen[22]).norm();
+    double y_scale0 = lengths[1] / (jCen[1]-jCen[0]).norm();
+    scalingTF[0] = Transfo::scale(Vec3(xz_scale0, y_scale0, xz_scale0));
+
+    double xz_scale2 = (newCen[5]-newCen[12]).norm() / (jCen[5]-jCen[12]).norm();
+    double xz_scale1 = (xz_scale0+xz_scale2)*0.5;
+    double y_scale1 = lengths[2] / (jCen[1]-jCen[2]).norm();
+    scalingTF[1] = Transfo::translate(newCen[1]-jCen[1])*Transfo::scale(jCen[1], Vec3(xz_scale1, y_scale1, xz_scale1));
+
+    double y_scale2 = (lengths[3]) / (jCen[2]-jCen[3]).norm();
+    Transfo tf2 = Transfo::translate(newCen[2]-jCen[2])*Transfo::scale(jCen[2],Vec3(xz_scale2, y_scale2, xz_scale2));
+    scalingTF[2] = tf2;
+    group = {3, 4, 5, 11, 12};
+    for(int id:group){
+        Vec3 orientation = jCen[id]-jCen[parentJ[id]]; //orientation from parent
+        orientation.normalize();
+        newCen[id] = tf2*jCen[id];
+        scalingTF[id] = tf2;
+    }
+
+    //limbs
+    group = {6, 7, 13, 14, 19, 20, 23, 24, 26};
+    map<int,double> limbSF;
+    for(auto id:group){
+        Vec3 orientation = jCen[id]-jCen[parentJ[id]]; //orientation from parent
+        double l = orientation.normalize();
+
+        newCen[id] = newCen[parentJ[id]] + lengths[id]*orientation;
+
+        double r = (lengths[id]/l)-1;
+        Vec3 s = Vec3(1,1,1)+orientation*r; //sf for parent ID
+        limbSF[parentJ[id]] = r*100;
+        scalingTF[parentJ[id]] = Transfo::translate(newCen[parentJ[id]]-jCen[parentJ[id]])*Transfo::scale(jCen[parentJ[id]],s);
+    }
+
+    //extrimities
+    group = {7, 14, 20, 24, 26};
+    for(auto id:group){
+        scalingTF[id] = Transfo::translate(newCen[id]-jCen[id]);
+    }
+
+    cout<<endl<<"<Scaling factors>"<<endl;
+    cout.precision(3);
+    cout<<"lower torso  : xz "<<(xz_scale0-1)*100<<" % / y "<<(y_scale0-1)*100<<" %"<<endl;
+    cout<<"middle torso : xz "<<(xz_scale1-1)*100<<" % / y "<<(y_scale1-1)*100<<" %"<<endl;
+    cout<<"upper Torso  : xz "<<(xz_scale2-1)*100<<" % / y "<<(y_scale2-1)*100<<" %"<<endl;
+    cout<<"neck         : "<<limbSF[3]<<" %"<<endl;
+    cout<<"head         : translation only"<<endl;
+    cout<<"lower arm    : R  "<<limbSF[13]<<" % / L "<<limbSF[6]<<" %"<<endl;
+    cout<<"hand         : translation only"<<endl;
+    cout<<"upper leg    : R  "<<limbSF[22]<<" % / L "<<limbSF[18]<<" %"<<endl;
+    cout<<"lower leg    : R  "<<limbSF[23]<<" % / L "<<limbSF[19]<<" %"<<endl;
+    cout<<"foot         : translation only"<<endl;
+    return scalingTF;
+}
+
+void ScaleToActor(const vector<Point3>& in_verts,
+                  vector<Point3>& out_verts,
+                  map<int, Transfo> scalingTF,
+                  const std::vector<std::map<int, double>>& weights){
+    out_verts.resize(in_verts.size());
+    for(int i=0;i<in_verts.size();i++){
+        Transfo tf(0);
+        for(auto w:weights[i]) tf = tf+ scalingTF[w.first]*w.second;
+        //if(tf.m[0]!=1) {cout<<tf;getchar();}
+        out_verts[i] = tf*in_verts[i];
+    }
+}
+#endif

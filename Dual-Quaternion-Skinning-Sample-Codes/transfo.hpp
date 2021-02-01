@@ -89,6 +89,10 @@ struct Transfo {
 
     inline Transfo() {}
 
+    inline Transfo(double c){
+        for(int i=0;i<16;i++) m[i]=c;
+    }
+
 
     inline Transfo(double a00, double a01, double a02, double a03,
                    double a10, double a11, double a12, double a13,

@@ -1,4 +1,9 @@
 include
 ./Dual-Quaternion-Skinning-Sample-Codes/
 .
+/home/hurel/codes/Geant4/10.06.p02/include/Geant4
+/home/hurel/codes/CLHEP/2.4.1.3/include
+/home/hurel/Azure-Kinect-Samples/body-tracking-samples/sample_helper_includes
+./helper/window_controller_3d
 src
+/usr/include/vtk-7.1

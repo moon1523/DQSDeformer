@@ -1,3 +1,11 @@
+src/bodydeformer.cc
+MotionCapt.cc
+include/bodydeformer.hh
+include/bodytracking.hh
+CMakeLists.txt
+CMakeLists.txt.save
+CMakeLists.txt2
+jointInfo
 src/TetMesh.cpp
 include/TetMesh.h
 src/Polygon.cc

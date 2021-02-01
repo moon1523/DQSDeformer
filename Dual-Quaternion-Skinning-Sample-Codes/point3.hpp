@@ -5,7 +5,7 @@
 #include <stdlib.h>
 
 #include "vec3.hpp"
-#include "G4ThreeVector.hh"
+//#include "G4ThreeVector.hh"
 
 // =============================================================================
 namespace Tbx {
@@ -100,9 +100,9 @@ struct Point3 {
         return Vec3(x, y, z);
     }
 
-    inline Point3 operator = (const G4ThreeVector& v) {
-        return Point3(v.getX(), v.getY(), v.getZ());
-    }
+//    inline Point3 operator = (const G4ThreeVector& v) {
+//        return Point3(v.getX(), v.getY(), v.getZ());
+//    }
 
     inline Point3 operator+(const Point3& p) const {
         return Point3(x + p.x, y + p.y, z + p.z);

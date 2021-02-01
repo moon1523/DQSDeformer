@@ -731,6 +731,7 @@ class Quat_cu{
          coeff[0]*q.coeff[3] + coeff[3]*q.coeff[0] + coeff[1]*q.coeff[2] - coeff[2]*q.coeff[1]);
     }
 
+
     Quat_cu operator* (double scalar) const
     {
         return Quat_cu(coeff[0] * scalar,
