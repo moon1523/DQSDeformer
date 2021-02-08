@@ -5,11 +5,11 @@
 #include <fstream>
 #include <string>
 #include <vector>
-#include "G4ThreeVector.hh"
-#include "dual_quat_cu.hpp"
+//#include "G4ThreeVector.hh"
+//#include "dual_quat_cu.hpp"
 #include <map>
 #include <utility>
-#include "G4SystemOfUnits.hh"
+//#include "G4SystemOfUnits.hh"
 
 using namespace std;
 typedef std::pair<Tbx::Point3, Tbx::Quat_cu> JointData;
