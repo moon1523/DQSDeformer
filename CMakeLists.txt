@@ -12,6 +12,7 @@ if (OPENMP_FOUND)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
     set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+    set (LIBIGL_INCLUDE_DIR "/home/sungho/code/BBW/libigl/include")
 endif()
 
 #k4a
@@ -30,7 +31,7 @@ find_package(LIBIGL REQUIRED QUIET)
 #file(GLOB sources ${PROJECT_SOURCE_DIR}/src/*.cc)
 file(GLOB headers ${PROJECT_SOURCE_DIR}/include/*.h)
 include_directories(${PROJECT_SOURCE_DIR}/include
-                    ~/Azure-Kinect-Samples/body-tracking-samples/sample_helper_includes/)
+		/home/sungho/code/Azure-Kinect-Samples/body-tracking-samples/sample_helper_includes)
 add_executable(MotionCapt MotionCapt.cc ${sources} ${headers})# ${dqs})
 
 # Dependencies of this library
